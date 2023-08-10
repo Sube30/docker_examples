@@ -13,6 +13,7 @@ from keras.applications import imagenet_utils
 from keras.preprocessing.image import img_to_array
 from PIL import Image
 from io import BytesIO
+import numpy as np
 
 
 app = Flask(__name__)
@@ -120,26 +121,28 @@ class Classify(Resource):
         #Load the Image\
         response = requests.get(url)
         img = Image.open(BytesIO(response.content))
-        
+
 
         #Preprocess the Image
+        img = img.resize((299,299))
+        img_array = img_to_array(img)
+        img_array = np.expand_dims(img_array,axis = 0)
+        img_array = preprocess_input(img_array)
 
-        #Make the predictions
+        #Predictions
 
-
+        prediction= pretrained_model.predict(img_array)
+        actual_prediction = imagenet_utils.decode_predictions(prediction, top =5)
+        print(actual_prediction)
         #Send the response
-        
-        
+
+        ret_json = {}
+
+        for pred in actual_prediction[0]:
+            ret_json[pred[1]] = float(pred[2]*100)
 
 
-        retJson = {}
-        with open('temp.jpg', 'wb') as f:
-            f.write(r.content)
-            proc = subprocess.Popen('python classify_image.py --model_dir=. --image_file=./temp.jpg', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-            ret = proc.communicate()[0]
-            proc.wait()
-            with open("text.txt") as f:
-                retJson = json.load(f)
+
 
 
         users.update_one({
@@ -150,7 +153,7 @@ class Classify(Resource):
             }
         })
 
-        return retJson
+        return jsonify(ret_json)
 
 
 class Refill(Resource):
@@ -184,3 +187,4 @@ api.add_resource(Refill, '/refill')
 
 if __name__=="__main__":
     app.run(host='0.0.0.0')
+
